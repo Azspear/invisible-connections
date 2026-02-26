@@ -3,12 +3,10 @@ const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
-
 router.use(authenticateToken);
 
-/**
- * Calculate compatibility score
- */
+/* ================= COMPATIBILITY FUNCTION ================= */
+
 function calculateCompatibility(user1Interests, user2Interests, user1Traits, user2Traits) {
   const interests1 = Array.isArray(user1Interests) ? user1Interests : [];
   const interests2 = Array.isArray(user2Interests) ? user2Interests : [];
@@ -17,23 +15,101 @@ function calculateCompatibility(user1Interests, user2Interests, user1Traits, use
 
   const sharedInterests = interests1.filter(i => interests2.includes(i));
   const interestScore =
-    interests1.length > 0 && interests2.length > 0
+    interests1.length && interests2.length
       ? (sharedInterests.length / Math.max(interests1.length, interests2.length)) * 60
       : 0;
 
   const sharedTraits = traits1.filter(t => traits2.includes(t));
   const traitScore =
-    traits1.length > 0 && traits2.length > 0
+    traits1.length && traits2.length
       ? (sharedTraits.length / Math.max(traits1.length, traits2.length)) * 40
       : 0;
 
   return Math.min(Math.round(interestScore + traitScore), 95);
 }
 
-/**
- * POST /api/matches/create
- * Create match + conversation
- */
+/* ================= FIND MATCHES ================= */
+
+router.get('/find', async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const currentUserResult = await pool.query(`
+      SELECT 
+        u.id,
+        array_agg(DISTINCT i.name) FILTER (WHERE i.name IS NOT NULL) as interests,
+        array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) as traits
+      FROM users u
+      LEFT JOIN user_interests ui ON u.id = ui.user_id
+      LEFT JOIN interests i ON ui.interest_id = i.id
+      LEFT JOIN user_traits ut ON u.id = ut.user_id
+      LEFT JOIN traits t ON ut.trait_id = t.id
+      WHERE u.id = $1
+      GROUP BY u.id
+    `, [userId]);
+
+    if (!currentUserResult.rows.length) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentUser = currentUserResult.rows[0];
+
+    const potentialUsers = await pool.query(`
+      SELECT 
+        u.id,
+        u.username,
+        u.bio,
+        array_agg(DISTINCT i.name) FILTER (WHERE i.name IS NOT NULL) as interests,
+        array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) as traits
+      FROM users u
+      LEFT JOIN user_interests ui ON u.id = ui.user_id
+      LEFT JOIN interests i ON ui.interest_id = i.id
+      LEFT JOIN user_traits ut ON u.id = ut.user_id
+      LEFT JOIN traits t ON ut.trait_id = t.id
+      WHERE u.id != $1
+        AND u.is_active = true
+        AND u.id NOT IN (
+          SELECT user2_id FROM matches WHERE user1_id = $1
+          UNION
+          SELECT user1_id FROM matches WHERE user2_id = $1
+        )
+      GROUP BY u.id
+    `, [userId]);
+
+    const matches = potentialUsers.rows.map(user => {
+      const compatibility = calculateCompatibility(
+        currentUser.interests,
+        user.interests,
+        currentUser.traits,
+        user.traits
+      );
+
+      return {
+        id: user.id,
+        username: user.username,
+        bio: user.bio,
+        compatibility,
+        interests: user.interests || [],
+        traits: user.traits || [],
+        sharedInterests: (currentUser.interests || []).filter(i =>
+          (user.interests || []).includes(i)
+        ),
+        sharedTraits: (currentUser.traits || []).filter(t =>
+          (user.traits || []).includes(t)
+        )
+      };
+    });
+
+    res.json({ matches });
+
+  } catch (error) {
+    console.error('Find matches error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ================= CREATE MATCH ================= */
+
 router.post('/create', async (req, res) => {
   try {
     const user1Id = req.user.userId;
@@ -43,12 +119,10 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'user2Id is required' });
     }
 
-    // Prevent self match
     if (user1Id === user2Id) {
       return res.status(400).json({ error: 'Cannot match with yourself' });
     }
 
-    // Check existing match
     const existingMatch = await pool.query(
       `SELECT id FROM matches 
        WHERE (user1_id = $1 AND user2_id = $2) 
@@ -60,7 +134,6 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Match already exists' });
     }
 
-    // Get both users interests + traits
     const usersData = await pool.query(`
       SELECT 
         u.id,
@@ -75,10 +148,6 @@ router.post('/create', async (req, res) => {
       GROUP BY u.id
     `, [user1Id, user2Id]);
 
-    if (usersData.rows.length < 2) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
     const user1 = usersData.rows.find(u => u.id === user1Id);
     const user2 = usersData.rows.find(u => u.id === user2Id);
 
@@ -89,7 +158,6 @@ router.post('/create', async (req, res) => {
       user2.traits
     );
 
-    // Create match
     const matchResult = await pool.query(
       `INSERT INTO matches (user1_id, user2_id, compatibility_score, status) 
        VALUES ($1, $2, $3, 'active') 
@@ -97,20 +165,17 @@ router.post('/create', async (req, res) => {
       [user1Id, user2Id, compatibilityScore]
     );
 
-    const match = matchResult.rows[0];
-
-    // Create conversation
     const conversationResult = await pool.query(
       `INSERT INTO conversations (match_id, created_at) 
        VALUES ($1, NOW()) 
        RETURNING *`,
-      [match.id]
+      [matchResult.rows[0].id]
     );
 
     res.status(201).json({
       message: 'Match created successfully',
       match: {
-        id: match.id,
+        id: matchResult.rows[0].id,
         conversationId: conversationResult.rows[0].id,
         compatibilityScore
       }
@@ -122,9 +187,8 @@ router.post('/create', async (req, res) => {
   }
 });
 
-/**
- * GET /api/matches/my-matches
- */
+/* ================= MY MATCHES ================= */
+
 router.get('/my-matches', async (req, res) => {
   try {
     const userId = req.user.userId;
