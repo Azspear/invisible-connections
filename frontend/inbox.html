@@ -478,9 +478,6 @@
     </div>
   </div>
 </div>
-
-<!-- KEEP EVERYTHING ABOVE THE <script> EXACTLY THE SAME -->
-<!-- Only the SCRIPT section below is replaced -->
 <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 <script src="js/api.js"></script>
 <script>
@@ -489,8 +486,6 @@ let socket;
 let currentConversationId = null;
 let currentUserId = null;
 let currentUsername = null;
-
-/* ================= INIT ================= */
 
 async function init() {
   const isAuth = await checkAuth();
@@ -505,17 +500,10 @@ async function init() {
 
   initializeSocket();
   await loadConversations();
-  setupSearch();
-  setupMessageInput();
 }
 
-/* ================= SOCKET ================= */
-
 function initializeSocket() {
-  socket = io(SOCKET_URL, {
-    transports: ["websocket"],
-    reconnection: true
-  });
+  socket = io(SOCKET_URL);
 
   socket.on('connect', () => {
     socket.emit('authenticate', {
@@ -533,8 +521,6 @@ function initializeSocket() {
   });
 }
 
-/* ================= LOAD CONVERSATIONS ================= */
-
 async function loadConversations() {
   try {
     const data = await apiCall(API_ENDPOINTS.inbox);
@@ -548,25 +534,15 @@ async function loadConversations() {
     list.innerHTML = data.conversations.map(conv => `
       <div class="conversation-item"
            onclick="openConversation('${conv.conversation_id}')">
-        <div class="conversation-header">
-          <div class="conversation-username">${conv.other_username}</div>
-          <div class="conversation-time">${formatTime(conv.last_message_time)}</div>
-        </div>
+        <div class="conversation-username">${conv.other_username}</div>
         <div class="conversation-preview">${conv.last_message || 'No messages yet'}</div>
       </div>
     `).join('');
 
-    // ✅ AUTO OPEN FIRST CONVERSATION
-    if (!currentConversationId) {
-      openConversation(data.conversations[0].conversation_id);
-    }
-
-  } catch (e) {
-    console.error(e);
+  } catch (err) {
+    console.error(err);
   }
 }
-
-/* ================= OPEN CONVERSATION ================= */
 
 async function openConversation(conversationId) {
   currentConversationId = conversationId;
@@ -576,41 +552,25 @@ async function openConversation(conversationId) {
 
   socket.emit('join-conversation', conversationId);
 
-  const info = await apiCall(API_ENDPOINTS.conversationInfo(conversationId));
-
-  document.getElementById('chatUsername').textContent = info.other_username;
-  document.getElementById('compatibilityBadge').textContent =
-    info.compatibility_score + "% Match";
-
   await loadMessages(conversationId);
 }
 
-/* ================= LOAD MESSAGES ================= */
-
 async function loadMessages(conversationId) {
-  try {
-    const data = await apiCall(API_ENDPOINTS.conversationMessages(conversationId));
-    const container = document.getElementById('messagesContainer');
+  const data = await apiCall(API_ENDPOINTS.conversationMessages(conversationId));
+  const container = document.getElementById('messagesContainer');
 
-    container.innerHTML = data.messages.map(msg => `
-      <div class="message ${msg.sender_id == currentUserId ? 'sent' : 'received'}">
-        <div>${msg.content}</div>
-        <div class="message-time">${formatTime(msg.sent_at)}</div>
-      </div>
-    `).join('');
+  container.innerHTML = data.messages.map(msg => `
+    <div class="message ${msg.sender_id == currentUserId ? 'sent' : 'received'}">
+      <div>${msg.content}</div>
+    </div>
+  `).join('');
 
-    scrollToBottom();
-  } catch (e) {
-    console.error(e);
-  }
+  scrollToBottom();
 }
-
-/* ================= SEND MESSAGE ================= */
 
 function sendMessage() {
   const input = document.getElementById('messageInput');
   const content = input.value.trim();
-
   if (!content || !currentConversationId) return;
 
   socket.emit('send-message', {
@@ -621,36 +581,12 @@ function sendMessage() {
   input.value = '';
 }
 
-/* ================= HELPERS ================= */
-
 function appendMessage(msg) {
   const container = document.getElementById('messagesContainer');
   const div = document.createElement('div');
-
   div.className = `message ${msg.senderId == currentUserId ? 'sent' : 'received'}`;
-  div.innerHTML = `
-    <div>${msg.content}</div>
-    <div class="message-time">${formatTime(msg.sentAt)}</div>
-  `;
-
+  div.innerHTML = `<div>${msg.content}</div>`;
   container.appendChild(div);
-}
-
-function setupMessageInput() {
-  const input = document.getElementById('messageInput');
-
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-}
-
-function formatTime(timestamp) {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 }
 
 function scrollToBottom() {
