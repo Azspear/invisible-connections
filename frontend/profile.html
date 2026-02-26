@@ -220,7 +220,7 @@ function init() {
 function renderChips(containerId, items, selectedSet, countId) {
   const container = document.getElementById(containerId);
   container.innerHTML = items.map(item => `
-    <div class="chip" onclick="toggleChip(this, '${item}', ${containerId === 'interestsChips' ? 'selectedInterests' : 'selectedTraits'}, '${countId}')">
+    <div class="chip" onclick="toggleChip(this, '${item}', '${containerId === 'interestsChips' ? 'selectedInterests' : 'selectedTraits'}', '${countId}')">
       ${item}
     </div>
   `).join('');
