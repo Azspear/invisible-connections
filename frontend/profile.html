@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set Up Profile — Invisible Connections</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f13; --surface: #17171d; --border: rgba(255,255,255,0.08);
+      --accent: #667eea; --accent2: #764ba2; --text: #e8e8f0; --muted: #6b6b80;
+    }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+      padding: 40px 20px;
+    }
+    body::before {
+      content: ''; position: fixed; top: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(ellipse, rgba(118,75,162,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .page-header {
+      max-width: 680px; margin: 0 auto 40px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      font-family: 'DM Serif Display', serif; font-size: 20px;
+      background: linear-gradient(135deg, #667eea, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .user-badge {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; color: var(--muted);
+    }
+    .user-id {
+      font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--accent);
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    h1 { font-family: 'DM Serif Display', serif; font-size: 36px; margin-bottom: 8px; }
+    .subtitle { font-size: 15px; color: var(--muted); margin-bottom: 40px; line-height: 1.6; }
+
+    /* Steps */
+    .progress-steps {
+      display: flex; gap: 0; margin-bottom: 40px;
+    }
+    .step {
+      flex: 1; text-align: center; position: relative;
+    }
+    .step::after {
+      content: ''; position: absolute; top: 16px; left: 50%; right: -50%;
+      height: 2px; background: var(--border);
+    }
+    .step:last-child::after { display: none; }
+    .step.done::after { background: var(--accent); }
+
+    .step-dot {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid var(--border); background: var(--bg);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      position: relative; z-index: 1; margin-bottom: 8px;
+    }
+    .step.active .step-dot { border-color: var(--accent); color: var(--accent); }
+    .step.done .step-dot { border-color: var(--accent); background: var(--accent); color: white; }
+    .step-label { font-size: 12px; color: var(--muted); }
+    .step.active .step-label { color: var(--text); }
+
+    /* Card */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 40px; margin-bottom: 20px;
+    }
+
+    .card-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+    .card-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+    /* Tag chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip {
+      padding: 8px 16px; border: 1px solid var(--border);
+      border-radius: 24px; font-size: 14px; color: #b0b0c0;
+      cursor: pointer; transition: all 0.2s; user-select: none;
+      background: transparent;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+    .chip.selected {
+      border-color: var(--accent); background: rgba(102,126,234,0.15); color: var(--accent);
+      font-weight: 600;
+    }
+
+    .selection-count {
+      font-size: 13px; color: var(--muted); margin-top: 16px;
+    }
+    .selection-count span { color: var(--accent); font-weight: 600; }
+
+    /* Bio */
+    textarea {
+      width: 100%; padding: 14px 16px;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+      resize: vertical; min-height: 100px; transition: border-color 0.2s;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+    .char-count { font-size: 12px; color: var(--muted); text-align: right; margin-top: 6px; }
+
+    .error {
+      background: rgba(231,76,60,0.1); border: 1px solid rgba(231,76,60,0.3);
+      color: #ff6b6b; padding: 12px 16px; border-radius: 8px;
+      font-size: 14px; margin-bottom: 20px; display: none;
+    }
+    .error.show { display: block; }
+
+    .btn-submit {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white; border: none; border-radius: 10px;
+      font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; margin-top: 8px;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(102,126,234,0.4); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-skip {
+      width: 100%; padding: 12px; background: transparent;
+      border: 1px solid var(--border); border-radius: 10px;
+      color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 14px;
+      cursor: pointer; transition: all 0.2s; margin-top: 10px;
+    }
+    .btn-skip:hover { border-color: var(--muted); color: var(--text); }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="logo">Invisible Connections</div>
+  <div class="user-badge">
+    Your ID: <span class="user-id" id="userIdDisplay">----</span>
+  </div>
+</div>
+
+<div class="container">
+  <h1>Set up your profile</h1>
+  <p class="subtitle">Tell us what you're into — this is how we find your people. The more you share, the better your matches.</p>
+
+  <div class="progress-steps">
+    <div class="step active" id="step1">
+      <div class="step-dot">1</div>
+      <div class="step-label">Interests</div>
+    </div>
+    <div class="step" id="step2">
+      <div class="step-dot">2</div>
+      <div class="step-label">Personality</div>
+    </div>
+    <div class="step" id="step3">
+      <div class="step-dot">3</div>
+      <div class="step-label">Bio</div>
+    </div>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+
+  <!-- Interests -->
+  <div class="card" id="cardInterests">
+    <div class="card-title">What are you into?</div>
+    <div class="card-subtitle">Pick at least 3 interests. These power your compatibility score.</div>
+    <div class="chips" id="interestsChips"></div>
+    <div class="selection-count">Selected: <span id="interestCount">0</span> / 18 (min 3)</div>
+  </div>
+
+  <!-- Traits -->
+  <div class="card" id="cardTraits">
+    <div class="card-title">How would you describe yourself?</div>
+    <div class="card-subtitle">Pick at least 2 personality traits.</div>
+    <div class="chips" id="traitsChips"></div>
+    <div class="selection-count">Selected: <span id="traitCount">0</span> / 14 (min 2)</div>
+  </div>
+
+  <!-- Bio -->
+  <div class="card" id="cardBio">
+    <div class="card-title">A bit about you <span style="color:var(--muted);font-weight:400;font-size:14px;">(optional)</span></div>
+    <div class="card-subtitle">A short bio that'll appear on your profile. Keep it anonymous!</div>
+    <textarea id="bioInput" placeholder="e.g. Big fan of lo-fi music and late-night gaming sessions. Looking for people to talk about anime and philosophy." maxlength="500"></textarea>
+    <div class="char-count"><span id="charCount">0</span> / 500</div>
+  </div>
+
+  <button class="btn-submit" id="submitBtn" onclick="saveProfile()">Find My Matches →</button>
+  <button class="btn-skip" onclick="window.location.href='matches.html'">Skip for now</button>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+const INTERESTS = ['Music','Tech','Gaming','Movies','Reading','Travel','Fitness','Cooking','Art','Photography','Nature','Podcasts','Sports','Dancing','Writing','Anime','Fashion','Science'];
+const TRAITS = ['Introvert','Extrovert','Good Listener','Conversationalist','Creative','Analytical','Calm','Energetic','Adventurous','Thoughtful','Spontaneous','Empathetic','Organized','Flexible'];
+
+let selectedInterests = new Set();
+let selectedTraits = new Set();
+
+function init() {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  document.getElementById('userIdDisplay').textContent = user.username || '----';
+
+  renderChips('interestsChips', INTERESTS, selectedInterests, 'interestCount');
+  renderChips('traitsChips', TRAITS, selectedTraits, 'traitCount');
+
+  // Pre-fill if profile exists
+  loadExistingProfile();
+
+  // Bio char counter
+  document.getElementById('bioInput').addEventListener('input', function() {
+    document.getElementById('charCount').textContent = this.value.length;
+  });
+}
+
+function renderChips(containerId, items, selectedSet, countId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = items.map(item => `
+    <div class="chip" onclick="toggleChip(this, '${item}', ${containerId === 'interestsChips' ? 'selectedInterests' : 'selectedTraits'}, '${countId}')">
+      ${item}
+    </div>
+  `).join('');
+}
+
+function toggleChip(el, value, setName, countId) {
+  const set = setName === 'selectedInterests' ? selectedInterests : selectedTraits;
+  if (set.has(value)) {
+    set.delete(value);
+    el.classList.remove('selected');
+  } else {
+    set.add(value);
+    el.classList.add('selected');
+  }
+  document.getElementById(countId).textContent = set.size;
+  updateSteps();
+}
+
+function updateSteps() {
+  if (selectedInterests.size >= 3) {
+    document.getElementById('step1').className = 'step done';
+    document.getElementById('step1').querySelector('.step-dot').textContent = '✓';
+  }
+  if (selectedTraits.size >= 2) {
+    document.getElementById('step2').className = 'step done';
+    document.getElementById('step2').querySelector('.step-dot').textContent = '✓';
+  }
+}
+
+async function loadExistingProfile() {
+  try {
+    const profile = await apiCall(API_ENDPOINTS.profile);
+    if (profile.interests && profile.interests.length > 0) {
+      profile.interests.forEach(i => {
+        selectedInterests.add(i);
+        document.getElementById('interestCount').textContent = selectedInterests.size;
+        // Mark chip selected
+        const chips = document.querySelectorAll('#interestsChips .chip');
+        chips.forEach(chip => { if (chip.textContent.trim() === i) chip.classList.add('selected'); });
+      });
+    }
+    if (profile.traits && profile.traits.length > 0) {
+      profile.traits.forEach(t => {
+        selectedTraits.add(t);
+        document.getElementById('traitCount').textContent = selectedTraits.size;
+        const chips = document.querySelectorAll('#traitsChips .chip');
+        chips.forEach(chip => { if (chip.textContent.trim() === t) chip.classList.add('selected'); });
+      });
+    }
+    if (profile.bio) {
+      document.getElementById('bioInput').value = profile.bio;
+      document.getElementById('charCount').textContent = profile.bio.length;
+    }
+    updateSteps();
+  } catch (e) { /* new user */ }
+}
+
+async function saveProfile() {
+  const errorMsg = document.getElementById('errorMsg');
+  errorMsg.classList.remove('show');
+
+  if (selectedInterests.size < 3) {
+    errorMsg.textContent = 'Please select at least 3 interests.';
+    errorMsg.classList.add('show');
+    document.getElementById('cardInterests').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+  if (selectedTraits.size < 2) {
+    errorMsg.textContent = 'Please select at least 2 personality traits.';
+    errorMsg.classList.add('show');
+    document.getElementById('cardTraits').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    await apiCall(API_ENDPOINTS.profile, {
+      method: 'PUT',
+      body: JSON.stringify({
+        interests: Array.from(selectedInterests),
+        traits: Array.from(selectedTraits),
+        bio: document.getElementById('bioInput').value.trim() || null
+      })
+    });
+
+    // Mark step 3 done
+    document.getElementById('step3').className = 'step done';
+    document.getElementById('step3').querySelector('.step-dot').textContent = '✓';
+
+    window.location.href = 'matches.html';
+  } catch (error) {
+    errorMsg.textContent = error.message || 'Failed to save profile.';
+    errorMsg.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Find My Matches →';
+  }
+}
+
+// Auth check then init
+checkAuth().then(isAuth => {
+  if (!isAuth) { window.location.href = 'landing.html'; return; }
+  init();
+});
+</script>
+</body>
+</html>
