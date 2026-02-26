@@ -4,10 +4,10 @@
   "description": "Backend API for Invisible Connections - Anonymous Friendship Platform",
   "main": "server.js",
   "scripts": {
-    "start": "node scripts/initDatabase.js && node server.js"
-    "dev": "nodemon server.js",
-    "init-db": "node scripts/initDatabase.js"
-  },
+  "start": "node scripts/initDatabase.js && node server.js",
+  "dev": "nodemon server.js",
+  "init-db": "node scripts/initDatabase.js"
+}
   "keywords": ["friendship", "ai", "matching"],
   "author": "I. Akshith",
   "license": "MIT",
