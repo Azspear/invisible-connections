@@ -1,6 +1,6 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
-const SOCKET_URL = 'http://localhost:5000';
+const API_BASE_URL = 'https://invisible-connections-production.up.railway.app/api';
+const SOCKET_URL = 'https://invisible-connections-production.up.railway.app';
 
 // API endpoints
 const API_ENDPOINTS = {
