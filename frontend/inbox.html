@@ -479,7 +479,7 @@
   </div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 <script src="js/api.js"></script>
 <script>
 let socket;
@@ -523,6 +523,56 @@ function initializeSocket() {
       username: currentUsername 
     });
   });
+socket.on('connect_error', (error) => {
+    console.error('❌ Socket connection error:', error);
+    console.error('Socket URL:', SOCKET_URL);
+    // Show user-friendly error
+    showNotification('Real-time messaging unavailable. Messages may be delayed.', 'warning');
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.warn('⚠️ Socket disconnected:', reason);
+    if (reason === 'io server disconnect') {
+      // Reconnect manually
+      socket.connect();
+    }
+  });
+  
+  socket.on('reconnect', (attemptNumber) => {
+    console.log('✅ Socket reconnected after', attemptNumber, 'attempts');
+    showNotification('Connection restored!', 'success');
+  });
+  
+  socket.on('reconnect_failed', () => {
+    console.error('❌ Socket failed to reconnect');
+    showNotification('Cannot connect to server. Please refresh the page.', 'error');
+  });
+  
+  // ... rest of handlers
+}
+
+// Add notification helper
+function showNotification(message, type = 'info') {
+  // Create toast notification
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    background: ${type === 'error' ? '#e74c3c' : type === 'warning' ? '#f39c12' : '#27ae60'};
+    color: white;
+    border-radius: 8px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.remove();
+  }, 5000);
+}
   
   socket.on('new-message', (data) => {
     if (data.conversationId === currentConversationId) {
