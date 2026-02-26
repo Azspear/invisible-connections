@@ -265,11 +265,14 @@
 <script src="js/api.js"></script>
 <script>
 let currentUser = null;
-let pendingMatchUserId = null;
 
 async function init() {
   const isAuth = await checkAuth();
-  if (!isAuth) { window.location.href = 'landing.html'; return; }
+  if (!isAuth) { 
+    window.location.href = 'landing.html'; 
+    return; 
+  }
+
   currentUser = JSON.parse(localStorage.getItem('user'));
   document.getElementById('navUserId').textContent = currentUser.username;
   await loadMatches();
@@ -282,7 +285,7 @@ async function loadMatches() {
 
   try {
     const data = await apiCall(API_ENDPOINTS.findMatches + '?limit=20');
-    const grid = document.getElementById('matchesGrid');
+
     document.getElementById('discoverLoading').style.display = 'none';
 
     if (!data.matches || data.matches.length === 0) {
@@ -290,46 +293,66 @@ async function loadMatches() {
       return;
     }
 
+    const grid = document.getElementById('matchesGrid');
     grid.innerHTML = data.matches.map(m => renderMatchCard(m)).join('');
     grid.style.display = 'grid';
+
   } catch (e) {
+    console.error("Find matches error:", e);
     document.getElementById('discoverLoading').style.display = 'none';
     document.getElementById('discoverEmpty').style.display = 'block';
   }
 }
 
 function renderMatchCard(m) {
-  const circumference = 2 * Math.PI * 24;
-  const offset = circumference - (m.compatibility / 100) * circumference;
+
+  const compatibility = Number(m.compatibility) || 0;
+
+  const radius = 24;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (compatibility / 100) * circumference;
+
   const sharedTags = (m.sharedInterests || []).slice(0, 4);
-  const otherTags = (m.interests || []).filter(i => !sharedTags.includes(i)).slice(0, 2);
+  const otherTags = (m.interests || [])
+    .filter(i => !sharedTags.includes(i))
+    .slice(0, 2);
 
   return `
-    <div class="match-card" id="card-${m.id}">
+    <div class="match-card">
       <div class="match-card-header">
         <div class="match-id">${m.username}</div>
         <div class="compat-ring">
-          <svg width="56" height="56" viewBox="0 0 56 56">
+          <svg width="56" height="56">
             <circle class="bg" cx="28" cy="28" r="24" />
             <circle class="fill" cx="28" cy="28" r="24"
-              stroke-dasharray="${circumference - offset} ${offset}" />
+              stroke-dasharray="${dash} ${circumference}" />
           </svg>
-          <div class="compat-number">${m.compatibility}%</div>
+          <div class="compat-number">${compatibility}%</div>
         </div>
       </div>
-      <div class="match-bio">${m.bio || 'No bio yet — mystery person!'}</div>
+
+      <div class="match-bio">
+        ${m.bio || 'No bio yet — mystery person!'}
+      </div>
+
       <div class="tags">
         ${sharedTags.map(t => `<span class="tag shared">✓ ${t}</span>`).join('')}
         ${otherTags.map(t => `<span class="tag">${t}</span>`).join('')}
       </div>
+
       <div class="match-actions">
-        <button class="btn-chat" onclick="startChat(${m.id}, this)">💬 Start Chat</button>
+        <button class="btn-chat" onclick="startChat(${m.id}, this)">
+          💬 Start Chat
+        </button>
       </div>
     </div>
   `;
 }
 
 async function startChat(userId, btn) {
+
+  if (btn.disabled) return;
+
   const originalText = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = 'Connecting...';
@@ -341,14 +364,18 @@ async function startChat(userId, btn) {
     });
 
     showToast('🎉 Connection created! Opening chat...');
+
     setTimeout(() => {
       window.location.href = `inbox.html?conv=${data.match.conversationId}`;
     }, 800);
+
   } catch (e) {
+
     if (e.message && e.message.includes('already exists')) {
-      // Already matched — go to inbox
-      showToast('Already connected! Redirecting to inbox...');
-      setTimeout(() => { window.location.href = 'inbox.html'; }, 800);
+      showToast('Already connected! Redirecting...');
+      setTimeout(() => {
+        window.location.href = 'inbox.html';
+      }, 800);
     } else {
       showToast(e.message || 'Failed to connect', true);
       btn.disabled = false;
@@ -364,7 +391,7 @@ async function loadMyMatches() {
 
   try {
     const data = await apiCall(API_ENDPOINTS.myMatches);
-    const list = document.getElementById('myMatchesList');
+
     document.getElementById('myMatchesLoading').style.display = 'none';
 
     if (!data.matches || data.matches.length === 0) {
@@ -372,23 +399,38 @@ async function loadMyMatches() {
       return;
     }
 
+    const list = document.getElementById('myMatchesList');
+
     list.innerHTML = data.matches.map(m => `
-      <div class="my-match-row" onclick="window.location.href='inbox.html?conv=${m.conversation_id}'" style="cursor:pointer">
+      <div class="my-match-row"
+           onclick="window.location.href='inbox.html?conv=${m.conversation_id}'"
+           style="cursor:pointer">
+
         <div class="my-match-left">
           <div class="my-match-id">${m.other_username}</div>
           <div class="my-match-info">
-            <div>${m.compatibility_score}% compatible · matched ${formatTime(m.matched_at)}</div>
+            <div>${Number(m.compatibility_score) || 0}% compatible · matched ${formatTime(m.matched_at)}</div>
             <div class="last-msg">${m.last_message || 'No messages yet — say hello!'}</div>
           </div>
         </div>
+
         <div class="my-match-right">
-          ${parseInt(m.unread_count) > 0 ? `<span style="background:var(--accent);color:white;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600">${m.unread_count}</span>` : ''}
-          <button class="btn-chat" style="padding:8px 16px;font-size:13px">Open Chat →</button>
+          ${parseInt(m.unread_count) > 0 ? `
+            <span style="background:var(--accent);color:white;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600">
+              ${m.unread_count}
+            </span>` : ''}
+
+          <button class="btn-chat" style="padding:8px 16px;font-size:13px">
+            Open Chat →
+          </button>
         </div>
       </div>
     `).join('');
+
     list.style.display = 'flex';
+
   } catch (e) {
+    console.error("Load my matches error:", e);
     document.getElementById('myMatchesLoading').style.display = 'none';
     document.getElementById('myMatchesEmpty').style.display = 'block';
   }
@@ -396,12 +438,15 @@ async function loadMyMatches() {
 
 function switchTab(tab) {
   const tabs = document.querySelectorAll('.tab');
+
   if (tab === 'discover') {
-    tabs[0].classList.add('active'); tabs[1].classList.remove('active');
+    tabs[0].classList.add('active');
+    tabs[1].classList.remove('active');
     document.getElementById('discoverTab').style.display = 'block';
     document.getElementById('myMatchesTab').style.display = 'none';
   } else {
-    tabs[1].classList.add('active'); tabs[0].classList.remove('active');
+    tabs[1].classList.add('active');
+    tabs[0].classList.remove('active');
     document.getElementById('discoverTab').style.display = 'none';
     document.getElementById('myMatchesTab').style.display = 'block';
     loadMyMatches();
@@ -417,7 +462,10 @@ function showToast(msg, isError = false) {
 
 function formatTime(ts) {
   if (!ts) return '';
-  const d = new Date(ts), now = new Date(), diff = now - d;
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+
   if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
   if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
   return Math.floor(diff/86400000) + 'd ago';
