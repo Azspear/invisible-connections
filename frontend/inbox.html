@@ -479,338 +479,178 @@
   </div>
 </div>
 
+<!-- KEEP EVERYTHING ABOVE THE <script> EXACTLY THE SAME -->
+<!-- Only the SCRIPT section below is replaced -->
 <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 <script src="js/api.js"></script>
 <script>
+
 let socket;
 let currentConversationId = null;
 let currentUserId = null;
 let currentUsername = null;
 
-// Initialize
+/* ================= INIT ================= */
+
 async function init() {
-  // Check authentication
   const isAuth = await checkAuth();
   if (!isAuth) {
     window.location.href = 'landing.html';
     return;
   }
-  
+
   const user = JSON.parse(localStorage.getItem('user'));
   currentUserId = user.id;
   currentUsername = user.username;
-  
-  // Initialize Socket.io
+
   initializeSocket();
-  
-  // Load conversations
   await loadConversations();
-  
-  // Setup search
   setupSearch();
-  
-  // Setup message input
   setupMessageInput();
 }
 
+/* ================= SOCKET ================= */
+
 function initializeSocket() {
-  socket = io(SOCKET_URL);
-  
+  socket = io(SOCKET_URL, {
+    transports: ["websocket"],
+    reconnection: true
+  });
+
   socket.on('connect', () => {
-    console.log('✅ Socket connected');
-    socket.emit('authenticate', { 
-      userId: currentUserId, 
-      username: currentUsername 
+    socket.emit('authenticate', {
+      userId: currentUserId,
+      username: currentUsername
     });
   });
-socket.on('connect_error', (error) => {
-    console.error('❌ Socket connection error:', error);
-    console.error('Socket URL:', SOCKET_URL);
-    // Show user-friendly error
-    showNotification('Real-time messaging unavailable. Messages may be delayed.', 'warning');
-  });
-  
-  socket.on('disconnect', (reason) => {
-    console.warn('⚠️ Socket disconnected:', reason);
-    if (reason === 'io server disconnect') {
-      // Reconnect manually
-      socket.connect();
-    }
-  });
-  
-  socket.on('reconnect', (attemptNumber) => {
-    console.log('✅ Socket reconnected after', attemptNumber, 'attempts');
-    showNotification('Connection restored!', 'success');
-  });
-  
-  socket.on('reconnect_failed', () => {
-    console.error('❌ Socket failed to reconnect');
-    showNotification('Cannot connect to server. Please refresh the page.', 'error');
-  });
-  
-  // ... rest of handlers
-}
 
-// Add notification helper
-function showNotification(message, type = 'info') {
-  // Create toast notification
-  const toast = document.createElement('div');
-  toast.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    background: ${type === 'error' ? '#e74c3c' : type === 'warning' ? '#f39c12' : '#27ae60'};
-    color: white;
-    border-radius: 8px;
-    z-index: 10000;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  `;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    toast.remove();
-  }, 5000);
-}
-  
   socket.on('new-message', (data) => {
-    if (data.conversationId === currentConversationId) {
+    if (data.conversationId == currentConversationId) {
       appendMessage(data);
       scrollToBottom();
     }
-    
-    // Update conversation list
     loadConversations();
   });
-  
-  socket.on('new-message-notification', (data) => {
-    // Show notification for new message in other conversations
-    if (data.conversationId !== currentConversationId) {
-      // Could add a toast notification here
-      loadConversations();
-    }
-  });
-  
-  socket.on('user-typing', (data) => {
-    if (data.conversationId === currentConversationId) {
-      document.getElementById('typingIndicator').classList.add('show');
-    }
-  });
-  
-  socket.on('user-stop-typing', (data) => {
-    if (data.conversationId === currentConversationId) {
-      document.getElementById('typingIndicator').classList.remove('show');
-    }
-  });
 }
+
+/* ================= LOAD CONVERSATIONS ================= */
 
 async function loadConversations() {
   try {
     const data = await apiCall(API_ENDPOINTS.inbox);
-    const conversationsList = document.getElementById('conversationsList');
-    
-    if (data.conversations.length === 0) {
-      conversationsList.innerHTML = `
-        <div style="padding: 20px; text-align: center; color: #808080;">
-          <p>No conversations yet</p>
-          <p style="font-size: 13px; margin-top: 10px;">Search for a user to start chatting!</p>
-        </div>
-      `;
+    const list = document.getElementById('conversationsList');
+
+    if (!data.conversations || data.conversations.length === 0) {
+      list.innerHTML = `<div style="padding:20px;color:#808080">No conversations yet</div>`;
       return;
     }
-    
-    conversationsList.innerHTML = data.conversations.map(conv => `
-      <div class="conversation-item ${conv.conversation_id === currentConversationId ? 'active' : ''}" 
+
+    list.innerHTML = data.conversations.map(conv => `
+      <div class="conversation-item"
            onclick="openConversation('${conv.conversation_id}')">
         <div class="conversation-header">
           <div class="conversation-username">${conv.other_username}</div>
           <div class="conversation-time">${formatTime(conv.last_message_time)}</div>
         </div>
         <div class="conversation-preview">${conv.last_message || 'No messages yet'}</div>
-        ${conv.unread_count > 0 ? `<div class="unread-badge">${conv.unread_count}</div>` : ''}
       </div>
     `).join('');
-  } catch (error) {
-    console.error('Load conversations error:', error);
+
+    // ✅ AUTO OPEN FIRST CONVERSATION
+    if (!currentConversationId) {
+      openConversation(data.conversations[0].conversation_id);
+    }
+
+  } catch (e) {
+    console.error(e);
   }
 }
 
+/* ================= OPEN CONVERSATION ================= */
+
 async function openConversation(conversationId) {
   currentConversationId = conversationId;
-  
-  // Join socket room
-  socket.emit('join-conversation', conversationId);
-  
-  // Show chat container
+
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('chatContainer').style.display = 'flex';
-  
-  // Load conversation info
+
+  socket.emit('join-conversation', conversationId);
+
   const info = await apiCall(API_ENDPOINTS.conversationInfo(conversationId));
+
   document.getElementById('chatUsername').textContent = info.other_username;
-  document.getElementById('compatibilityBadge').textContent = `${info.compatibility_score}% Match`;
-  
-  // Load messages
+  document.getElementById('compatibilityBadge').textContent =
+    info.compatibility_score + "% Match";
+
   await loadMessages(conversationId);
-  
-  // Mark as read
-  socket.emit('mark-read', { conversationId });
-  
-  // Update conversation list
-  loadConversations();
 }
+
+/* ================= LOAD MESSAGES ================= */
 
 async function loadMessages(conversationId) {
   try {
     const data = await apiCall(API_ENDPOINTS.conversationMessages(conversationId));
-    const messagesContainer = document.getElementById('messagesContainer');
-    
-    messagesContainer.innerHTML = data.messages.map(msg => `
-      <div class="message ${msg.sender_id === currentUserId ? 'sent' : 'received'}">
+    const container = document.getElementById('messagesContainer');
+
+    container.innerHTML = data.messages.map(msg => `
+      <div class="message ${msg.sender_id == currentUserId ? 'sent' : 'received'}">
         <div>${msg.content}</div>
         <div class="message-time">${formatTime(msg.sent_at)}</div>
       </div>
     `).join('');
-    
+
     scrollToBottom();
-  } catch (error) {
-    console.error('Load messages error:', error);
+  } catch (e) {
+    console.error(e);
   }
 }
 
-function appendMessage(messageData) {
-  const messagesContainer = document.getElementById('messagesContainer');
-  const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${messageData.senderId === currentUserId ? 'sent' : 'received'}`;
-  messageDiv.innerHTML = `
-    <div>${messageData.content}</div>
-    <div class="message-time">${formatTime(messageData.sentAt)}</div>
-  `;
-  messagesContainer.appendChild(messageDiv);
-}
+/* ================= SEND MESSAGE ================= */
 
 function sendMessage() {
   const input = document.getElementById('messageInput');
   const content = input.value.trim();
-  
+
   if (!content || !currentConversationId) return;
-  
+
   socket.emit('send-message', {
     conversationId: currentConversationId,
     content
   });
-  
+
   input.value = '';
-  input.style.height = 'auto';
+}
+
+/* ================= HELPERS ================= */
+
+function appendMessage(msg) {
+  const container = document.getElementById('messagesContainer');
+  const div = document.createElement('div');
+
+  div.className = `message ${msg.senderId == currentUserId ? 'sent' : 'received'}`;
+  div.innerHTML = `
+    <div>${msg.content}</div>
+    <div class="message-time">${formatTime(msg.sentAt)}</div>
+  `;
+
+  container.appendChild(div);
 }
 
 function setupMessageInput() {
   const input = document.getElementById('messageInput');
-  
-  // Auto-resize
-  input.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = (this.scrollHeight) + 'px';
-  });
-  
-  // Send on Enter (Shift+Enter for new line)
+
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   });
-  
-  // Typing indicator
-  let typingTimeout;
-  input.addEventListener('input', function() {
-    if (currentConversationId) {
-      socket.emit('typing', { conversationId: currentConversationId });
-      
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        socket.emit('stop-typing', { conversationId: currentConversationId });
-      }, 1000);
-    }
-  });
-}
-
-function setupSearch() {
-  const searchInput = document.getElementById('searchInput');
-  const searchResult = document.getElementById('searchResult');
-  
-  let searchTimeout;
-  searchInput.addEventListener('input', function() {
-    clearTimeout(searchTimeout);
-    const username = this.value.trim();
-    
-    if (username.length === 4) {
-      searchTimeout = setTimeout(() => searchUser(username), 500);
-    } else {
-      searchResult.classList.remove('show');
-    }
-  });
-}
-
-async function searchUser(username) {
-  const searchResult = document.getElementById('searchResult');
-  
-  try {
-    const data = await apiCall(API_ENDPOINTS.searchUsers, {
-      method: 'POST',
-      body: JSON.stringify({ username })
-    });
-    
-    searchResult.innerHTML = `
-      <div class="username">${data.user.username}</div>
-      <div class="bio">${data.user.bio || 'No bio'}</div>
-      <button class="btn-message" onclick="startConversation('${data.user.id}', ${data.alreadyMatched}, '${data.conversationId || ''}')">
-        ${data.alreadyMatched ? 'Open Chat' : 'Start Chat'}
-      </button>
-    `;
-    searchResult.classList.add('show');
-  } catch (error) {
-    searchResult.innerHTML = `<div style="color: #e74c3c;">User not found</div>`;
-    searchResult.classList.add('show');
-  }
-}
-
-async function startConversation(userId, alreadyMatched, conversationId) {
-  if (alreadyMatched) {
-    openConversation(conversationId);
-  } else {
-    // Create match first
-    try {
-      const matchData = await apiCall(API_ENDPOINTS.createMatch, {
-        method: 'POST',
-        body: JSON.stringify({ user2Id: userId })
-      });
-      
-      await loadConversations();
-      openConversation(matchData.match.conversationId);
-    } catch (error) {
-      alert('Failed to start conversation: ' + error.message);
-    }
-  }
-  
-  document.getElementById('searchInput').value = '';
-  document.getElementById('searchResult').classList.remove('show');
 }
 
 function formatTime(timestamp) {
   if (!timestamp) return '';
-  
   const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now - date;
-  
-  if (diff < 60000) return 'Just now';
-  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-  if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
-  
-  return date.toLocaleDateString();
+  return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 }
 
 function scrollToBottom() {
@@ -818,35 +658,8 @@ function scrollToBottom() {
   container.scrollTop = container.scrollHeight;
 }
 
-function viewProfile() {
-  // TODO: Implement profile view modal
-  alert('Profile view coming soon!');
-}
+window.addEventListener('load', init);
 
-function blockUser() {
-  if (confirm('Are you sure you want to block this user?')) {
-    // TODO: Implement block functionality
-    alert('Block feature coming soon!');
-  }
-}
-
-// Auto-open conversation from URL param
-async function openFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const convId = params.get('conv');
-  if (convId) {
-    // Clean URL without reload
-    window.history.replaceState({}, '', 'inbox.html');
-    await openConversation(convId);
-  }
-}
-
-// Initialize on load
-window.addEventListener('load', async () => {
-  await init();
-  await openFromUrl();
-});
 </script>
-
 </body>
 </html>
