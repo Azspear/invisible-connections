@@ -210,7 +210,8 @@
     <span class="nav-id">You are <strong id="navUserId">----</strong></span>
     <a href="messages.html" class="btn-nav btn-accent">📬 Inbox</a>
     <a href="profile.html" class="btn-nav btn-outline">Edit Profile</a>
-    <button class="btn-nav btn-ghost" onclick="logout()">Sign out</button>
+    <button class="btn-nav btn-ghost" onclic
+t()">Sign out</button>
   </div>
 </nav>
 
@@ -366,7 +367,7 @@ async function startChat(userId, btn) {
     showToast('🎉 Connection created! Opening chat...');
 
     setTimeout(() => {
-      window.location.href = `inbox.html?conv=${data.match.conversationId}`;
+      window.location.href = `messages.html?conv=${data.match.conversationId}`;
     }, 800);
 
   } catch (e) {
