@@ -2,33 +2,31 @@
 const API_BASE_URL = "https://invisible-connections-production.up.railway.app";
 const SOCKET_URL = 'https://invisible-connections-production.up.railway.app';
 
-// API endpoints
 const API_ENDPOINTS = {
   // Auth
   register: `${API_BASE_URL}/api/auth/register`,
   login: `${API_BASE_URL}/api/auth/login`,
-  verify: `${API_BASE_URL}/auth/verify`,
+  verify: `${API_BASE_URL}/api/auth/verify`,
   
   // Users
-  profile: `${API_BASE_URL}/users/profile`,
-  interests: `${API_BASE_URL}/users/interests`,
-  traits: `${API_BASE_URL}/users/traits`,
-  userByUsername: (username) => `${API_BASE_URL}/users/${username}`,
+  profile: `${API_BASE_URL}/api/users/profile`,
+  interests: `${API_BASE_URL}/api/users/interests`,
+  traits: `${API_BASE_URL}/api/users/traits`,
+  userByUsername: (username) => `${API_BASE_URL}/api/users/${username}`,
   
   // Matches
-  findMatches: `${API_BASE_URL}/matches/find`,
-  createMatch: `${API_BASE_URL}/matches/create`,
-  myMatches: `${API_BASE_URL}/matches/my-matches`,
-  deleteMatch: (matchId) => `${API_BASE_URL}/matches/${matchId}`,
+  findMatches: `${API_BASE_URL}/api/matches/find`,
+  createMatch: `${API_BASE_URL}/api/matches/create`,
+  myMatches: `${API_BASE_URL}/api/matches/my-matches`,
+  deleteMatch: (matchId) => `${API_BASE_URL}/api/matches/${matchId}`,
   
   // Inbox
-  inbox: `${API_BASE_URL}/inbox`,
-  conversation: (conversationId) => `${API_BASE_URL}/inbox/${conversationId}`,
-  conversationMessages: (conversationId) => `${API_BASE_URL}/inbox/${conversationId}/messages`,
-  conversationInfo: (conversationId) => `${API_BASE_URL}/inbox/${conversationId}/info`,
-  searchUsers: `${API_BASE_URL}/inbox/search-users`,
+  inbox: `${API_BASE_URL}/api/inbox`,
+  conversation: (conversationId) => `${API_BASE_URL}/api/inbox/${conversationId}`,
+  conversationMessages: (conversationId) => `${API_BASE_URL}/api/inbox/${conversationId}/messages`,
+  conversationInfo: (conversationId) => `${API_BASE_URL}/api/inbox/${conversationId}/info`,
+  searchUsers: `${API_BASE_URL}/api/inbox/search-users`,
 };
-
 // Helper function to get auth headers
 function getAuthHeaders() {
   const token = localStorage.getItem('token');
