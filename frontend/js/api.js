@@ -1,12 +1,12 @@
 // API Configuration
-const API_BASE_URL = 'https://invisible-connections-production.up.railway.app';
+const API_BASE_URL = "https://invisible-connections-production.up.railway.app";
 const SOCKET_URL = 'https://invisible-connections-production.up.railway.app';
 
 // API endpoints
 const API_ENDPOINTS = {
   // Auth
-  register: `${API_BASE_URL}/auth/register`,
-  login: `${API_BASE_URL}/auth/login`,
+  register: `${API_BASE_URL}/api/auth/register`,
+  login: `${API_BASE_URL}/api/auth/login`,
   verify: `${API_BASE_URL}/auth/verify`,
   
   // Users
