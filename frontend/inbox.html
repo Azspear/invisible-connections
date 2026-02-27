@@ -478,6 +478,7 @@
     </div>
   </div>
 </div>
+
 <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 <script src="js/api.js"></script>
 <script>
@@ -486,6 +487,7 @@ let socket;
 let currentConversationId = null;
 let currentUserId = null;
 let currentUsername = null;
+let currentOtherUserId = null;
 
 async function init() {
   const isAuth = await checkAuth();
@@ -516,45 +518,65 @@ async function init() {
   });
 
   await loadConversations();
+
+  // Search input handler
+  document.getElementById('searchInput').addEventListener('input', handleSearch);
+
+  // Send on Enter (Shift+Enter for newline)
+  document.getElementById('messageInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 }
 
 async function loadConversations() {
   const data = await apiCall(API_ENDPOINTS.inbox);
   const list = document.getElementById('conversationsList');
 
-  if (!data.conversations.length) {
+  if (!data.conversations || !data.conversations.length) {
     list.innerHTML = '<div style="padding:20px;color:#808080">No conversations yet</div>';
     return;
   }
 
-  list.innerHTML = data.conversations.map(conv => `
-    <div class="conversation-item"
-         onclick="openConversation('${conv.conversation_id}')">
-      <div class="conversation-username">${conv.other_username}</div>
-      <div class="conversation-preview">${conv.last_message || 'No messages yet'}</div>
-    </div>
-  `).join('');
+  list.innerHTML = data.conversations.map(conv => {
+    return '<div class="conversation-item" onclick="openConversation(\'' + conv.conversation_id + '\', \'' + conv.other_username + '\', \'' + (conv.other_user_id || '') + '\')">' +
+      '<div class="conversation-username">' + conv.other_username + '</div>' +
+      '<div class="conversation-preview">' + (conv.last_message || 'No messages yet') + '</div>' +
+      '</div>';
+  }).join('');
 
   // Auto open first conversation
-  openConversation(data.conversations[0].conversation_id);
+  const first = data.conversations[0];
+  openConversation(first.conversation_id, first.other_username, first.other_user_id || '');
 }
 
-async function openConversation(id) {
+async function openConversation(id, username, otherUserId) {
   currentConversationId = id;
+  currentOtherUserId = otherUserId || null;
+
+  // Update active state
+  document.querySelectorAll('.conversation-item').forEach(el => el.classList.remove('active'));
+  event && event.currentTarget && event.currentTarget.classList.add('active');
 
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('chatContainer').style.display = 'flex';
+
+  if (username) {
+    document.getElementById('chatUsername').textContent = username;
+  }
 
   socket.emit('join-conversation', id);
 
   const data = await apiCall(API_ENDPOINTS.conversationMessages(id));
   const container = document.getElementById('messagesContainer');
 
-  container.innerHTML = data.messages.map(msg => `
-    <div class="message ${msg.sender_id == currentUserId ? 'sent' : 'received'}">
-      <div>${msg.content}</div>
-    </div>
-  `).join('');
+  container.innerHTML = data.messages.map(msg => {
+    return '<div class="message ' + (msg.sender_id == currentUserId ? 'sent' : 'received') + '">' +
+      '<div>' + msg.content + '</div>' +
+      '</div>';
+  }).join('');
 
   scrollToBottom();
 }
@@ -562,11 +584,11 @@ async function openConversation(id) {
 function sendMessage() {
   const input = document.getElementById('messageInput');
   const content = input.value.trim();
-  if (!content) return;
+  if (!content || !currentConversationId) return;
 
   socket.emit('send-message', {
     conversationId: currentConversationId,
-    content
+    content: content
   });
 
   input.value = '';
@@ -575,14 +597,82 @@ function sendMessage() {
 function appendMessage(msg) {
   const container = document.getElementById('messagesContainer');
   const div = document.createElement('div');
-  div.className = `message ${msg.senderId == currentUserId ? 'sent' : 'received'}`;
-  div.innerHTML = `<div>${msg.content}</div>`;
+  div.className = 'message ' + (msg.senderId == currentUserId ? 'sent' : 'received');
+  div.innerHTML = '<div>' + msg.content + '</div>';
   container.appendChild(div);
 }
 
 function scrollToBottom() {
   const container = document.getElementById('messagesContainer');
   container.scrollTop = container.scrollHeight;
+}
+
+async function handleSearch() {
+  const query = document.getElementById('searchInput').value.trim();
+  const resultDiv = document.getElementById('searchResult');
+
+  if (query.length !== 4 || isNaN(query)) {
+    resultDiv.classList.remove('show');
+    resultDiv.innerHTML = '';
+    return;
+  }
+
+  try {
+    const data = await apiCall(API_ENDPOINTS.searchUser ? API_ENDPOINTS.searchUser(query) : '/api/users/search/' + query);
+    if (data && data.user) {
+      resultDiv.innerHTML =
+        '<div class="username">' + data.user.username + '</div>' +
+        '<div class="bio">' + (data.user.bio || '') + '</div>' +
+        '<button class="btn-message" onclick="startConversation(\'' + data.user.id + '\', \'' + data.user.username + '\')">Message</button>';
+      resultDiv.classList.add('show');
+    } else {
+      resultDiv.innerHTML = '<div style="color:#808080;font-size:13px">No user found</div>';
+      resultDiv.classList.add('show');
+    }
+  } catch (err) {
+    resultDiv.innerHTML = '<div style="color:#808080;font-size:13px">No user found</div>';
+    resultDiv.classList.add('show');
+  }
+}
+
+async function startConversation(userId, username) {
+  try {
+    const data = await apiCall(API_ENDPOINTS.createConversation || '/api/conversations', 'POST', { userId: userId });
+    if (data && data.conversationId) {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchResult').classList.remove('show');
+      await loadConversations();
+      openConversation(data.conversationId, username, userId);
+    }
+  } catch (err) {
+    console.error('Failed to start conversation:', err);
+  }
+}
+
+function viewProfile() {
+  if (currentOtherUserId) {
+    window.location.href = 'profile.html?id=' + currentOtherUserId;
+  }
+}
+
+function blockUser() {
+  if (!currentOtherUserId) return;
+  if (!confirm('Are you sure you want to block this user?')) return;
+  apiCall('/api/users/block', 'POST', { userId: currentOtherUserId })
+    .then(() => {
+      alert('User blocked.');
+      currentConversationId = null;
+      document.getElementById('chatContainer').style.display = 'none';
+      document.getElementById('emptyState').style.display = 'flex';
+      loadConversations();
+    })
+    .catch(err => console.error('Block failed:', err));
+}
+
+function logout() {
+  localStorage.removeItem('user');
+  localStorage.removeItem('token');
+  window.location.href = 'landing.html';
 }
 
 window.addEventListener('load', init);
