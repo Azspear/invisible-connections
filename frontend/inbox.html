@@ -541,15 +541,21 @@ async function loadConversations() {
   }
 
   list.innerHTML = data.conversations.map(conv => {
-    return '<div class="conversation-item" onclick="openConversation(\'' + conv.conversation_id + '\', \'' + conv.other_username + '\', \'' + (conv.other_user_id || '') + '\', this)">' +
+    return '<div class="conversation-item" id="conv-' + conv.conversation_id + '" onclick="openConversation(\'' + conv.conversation_id + '\', \'' + conv.other_username + '\', \'' + (conv.other_user_id || '') + '\', this)">' +
       '<div class="conversation-username">' + conv.other_username + '</div>' +
       '<div class="conversation-preview">' + (conv.last_message || 'No messages yet') + '</div>' +
       '</div>';
   }).join('');
 
-  // Auto open first conversation
-  const first = data.conversations[0];
-  openConversation(first.conversation_id, first.other_username, first.other_user_id || '', null);
+  // Open ?conv=ID from URL, or fall back to first
+  const urlParams = new URLSearchParams(window.location.search);
+  const convParam = urlParams.get('conv');
+  const target = convParam ? data.conversations.find(c => String(c.conversation_id) === String(convParam)) : null;
+  const toOpen = target || data.conversations[0];
+  if (toOpen) {
+    const el = document.getElementById('conv-' + toOpen.conversation_id);
+    openConversation(toOpen.conversation_id, toOpen.other_username, toOpen.other_user_id || '', el);
+  }
 }
 
 async function openConversation(id, username, otherUserId, clickedEl) {
@@ -567,18 +573,25 @@ async function openConversation(id, username, otherUserId, clickedEl) {
     document.getElementById('chatUsername').textContent = username;
   }
 
-  socket.emit('join-conversation', id);
+  // Guard against socket not being ready yet
+  if (socket && socket.connected) {
+    socket.emit('join-conversation', id);
+  } else if (socket) {
+    socket.once('connect', () => socket.emit('join-conversation', id));
+  }
 
-  const data = await apiCall(API_ENDPOINTS.conversationMessages(id));
-  const container = document.getElementById('messagesContainer');
-
-  container.innerHTML = data.messages.map(msg => {
-    return '<div class="message ' + (msg.sender_id == currentUserId ? 'sent' : 'received') + '">' +
-      '<div>' + msg.content + '</div>' +
-      '</div>';
-  }).join('');
-
-  scrollToBottom();
+  try {
+    const data = await apiCall(API_ENDPOINTS.conversationMessages(id));
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = data.messages.map(msg => {
+      return '<div class="message ' + (msg.sender_id == currentUserId ? 'sent' : 'received') + '">' +
+        '<div>' + msg.content + '</div>' +
+        '</div>';
+    }).join('');
+    scrollToBottom();
+  } catch (err) {
+    console.error('Failed to load messages:', err);
+  }
 }
 
 function sendMessage() {
