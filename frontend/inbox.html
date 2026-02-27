@@ -623,12 +623,11 @@ function sendMessage() {
 
   socket.emit("send-message", {
     conversationId: currentConversationId,
-    content,
+    content: content
   });
 
   input.value = "";
 }
-
 /* ================= UI HELPERS ================= */
 
 function appendMessage(msg) {
@@ -655,6 +654,7 @@ function scrollToBottom() {
 }
 
 function setupMessageInput() {
+  function setupMessageInput() {
   const input = document.getElementById("messageInput");
 
   input.addEventListener("keydown", function (e) {
@@ -664,6 +664,8 @@ function setupMessageInput() {
     }
   });
 }
+
+window.addEventListener("load", init);
 
 window.addEventListener("load", init);
 
