@@ -17,27 +17,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 /* -------------------------------------------------------- */
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:8000',
-  'http://127.0.0.1:8000',
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
-
 app.use(cors({
   origin: true,
   credentials: true
 }));
 
+const io = new Server(server, {
+  cors: {
+    origin: true,
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
 app.use(helmet());
 
 // Rate limiting
