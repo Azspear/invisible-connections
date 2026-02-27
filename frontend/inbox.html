@@ -498,11 +498,6 @@ async function init() {
   currentUserId = user.id;
   currentUsername = user.username;
 
-  initializeSocket();
-  await loadConversations();
-}
-
-function initializeSocket() {
   socket = io(SOCKET_URL);
 
   socket.on('connect', () => {
@@ -519,44 +514,40 @@ function initializeSocket() {
     }
     loadConversations();
   });
+
+  await loadConversations();
 }
 
 async function loadConversations() {
-  try {
-    const data = await apiCall(API_ENDPOINTS.inbox);
-    const list = document.getElementById('conversationsList');
+  const data = await apiCall(API_ENDPOINTS.inbox);
+  const list = document.getElementById('conversationsList');
 
-    if (!data.conversations || data.conversations.length === 0) {
-      list.innerHTML = `<div style="padding:20px;color:#808080">No conversations yet</div>`;
-      return;
-    }
-
-    list.innerHTML = data.conversations.map(conv => `
-      <div class="conversation-item"
-           onclick="openConversation('${conv.conversation_id}')">
-        <div class="conversation-username">${conv.other_username}</div>
-        <div class="conversation-preview">${conv.last_message || 'No messages yet'}</div>
-      </div>
-    `).join('');
-
-  } catch (err) {
-    console.error(err);
+  if (!data.conversations.length) {
+    list.innerHTML = '<div style="padding:20px;color:#808080">No conversations yet</div>';
+    return;
   }
+
+  list.innerHTML = data.conversations.map(conv => `
+    <div class="conversation-item"
+         onclick="openConversation('${conv.conversation_id}')">
+      <div class="conversation-username">${conv.other_username}</div>
+      <div class="conversation-preview">${conv.last_message || 'No messages yet'}</div>
+    </div>
+  `).join('');
+
+  // Auto open first conversation
+  openConversation(data.conversations[0].conversation_id);
 }
 
-async function openConversation(conversationId) {
-  currentConversationId = conversationId;
+async function openConversation(id) {
+  currentConversationId = id;
 
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('chatContainer').style.display = 'flex';
 
-  socket.emit('join-conversation', conversationId);
+  socket.emit('join-conversation', id);
 
-  await loadMessages(conversationId);
-}
-
-async function loadMessages(conversationId) {
-  const data = await apiCall(API_ENDPOINTS.conversationMessages(conversationId));
+  const data = await apiCall(API_ENDPOINTS.conversationMessages(id));
   const container = document.getElementById('messagesContainer');
 
   container.innerHTML = data.messages.map(msg => `
@@ -571,7 +562,7 @@ async function loadMessages(conversationId) {
 function sendMessage() {
   const input = document.getElementById('messageInput');
   const content = input.value.trim();
-  if (!content || !currentConversationId) return;
+  if (!content) return;
 
   socket.emit('send-message', {
     conversationId: currentConversationId,
