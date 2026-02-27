@@ -30,7 +30,7 @@
       background: var(--bg-dark);
       color: var(--text);
       height: 100vh;
-      overflow: hidden;
+      
     }
 
     /* Layout */
@@ -539,9 +539,9 @@
   }
 
   .inbox-container {
-    flex-direction: column;
-    height: 100%;
-  }
+  display: flex;
+  height: calc(var(--vh, 1vh) * 100);
+}
 
   .sidebar {
     width: 100%;
@@ -868,6 +868,13 @@ function initializeSocket() {
     
     loadConnections();
   });
+function setVH() {
+  let vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+window.addEventListener('resize', setVH);
+setVH();
 
   socket.on('user-typing', (data) => {
     if (data.conversationId === currentConversationId) {
