@@ -595,20 +595,20 @@ async function loadMessages(conversationId) {
 
   const container = document.getElementById("messagesContainer");
 
-  container.innerHTML = data.messages
-    .map(
-      (msg) => `
-    <div class="message ${
-      msg.sender_id == currentUserId ? "sent" : "received"
-    }">
-      <div>${msg.content}</div>
-      <div class="message-time">
-        ${new Date(msg.sent_at).toLocaleTimeString()}
+container.innerHTML = data.messages
+  .map(
+    (msg) => `
+      <div class="message ${
+        msg.sender_id == currentUserId ? "sent" : "received"
+      }">
+        <div>${msg.content}</div>
+        <div class="message-time">
+          ${new Date(msg.sent_at).toLocaleTimeString()}
+        </div>
       </div>
-    </div>
-  `
-    )
-    .join("");
+    `
+  )
+  .join("");
 
   scrollToBottom();
 }
@@ -662,7 +662,7 @@ function setupMessageInput() {
       e.preventDefault();
       sendMessage();
     }
-  });
+  };
 }
 
 window.addEventListener("load", init);
