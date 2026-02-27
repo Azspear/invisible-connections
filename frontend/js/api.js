@@ -39,8 +39,20 @@ function getAuthHeaders() {
 }
 
 // Helper function to make authenticated API calls
-async function apiCall(url, options = {}) {
+// Accepts either apiCall(url, options) or apiCall(url, method, body)
+async function apiCall(url, methodOrOptions = {}, body = null) {
+  let options;
+  if (typeof methodOrOptions === 'string') {
+    options = {
+      method: methodOrOptions,
+      body: body ? JSON.stringify(body) : undefined
+    };
+  } else {
+    options = methodOrOptions;
+  }
+
   const defaultOptions = {
+    method: 'GET',
     headers: getAuthHeaders(),
     ...options
   };
